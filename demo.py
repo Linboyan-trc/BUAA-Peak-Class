@@ -72,8 +72,8 @@ def run_and_log(name, model, tokenizer, prompt, device):
     return result
 
 def main():
-    model_name = "/mtc/longlingkun/models/llama3.1-8b-instruct"
-    device = "cuda:1"
+    model_name = "/mtc/yangrongjin/models/Qwen3-1.7B"
+    device = "cuda:2"
 
     print("加载分词器...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
