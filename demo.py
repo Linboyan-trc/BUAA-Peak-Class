@@ -87,7 +87,7 @@ def replace_llama(method, model_name=None):
 # 1. 推理
 def main():
     # 1. 指定模型和设备
-    model_name = "/mtc/yangrongjin/models/Qwen3-1.7B"
+    model_name = "/mtc/longlingkun/models/llama3.1-8b-instruct"
     device = "cuda:2"
 
     # 2. 加载分词器
