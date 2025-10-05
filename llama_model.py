@@ -30,10 +30,13 @@ def llama_attn_forward_StreamingLLM(
     position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.45
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    # 1. hidden_states就是输入x，形状是[1, 32, 128]，意思是只有1句话，输入被分成32个token，每个token隐藏层是128维
+    # 1.1 这里获取到bsz=1, q_len=32就是token数量, _是隐藏层维度不需要
     bsz, q_len, _ = hidden_states.size()
 
     init_StreamingLLM(self)
 
+    # 2. 并行
     if self.config.pretraining_tp > 1:
         key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
         query_slices = self.q_proj.weight.split(
@@ -51,11 +54,11 @@ def llama_attn_forward_StreamingLLM(
         value_states = [F.linear(hidden_states, value_slices[i]) for i in range(self.config.pretraining_tp)]
         value_states = torch.cat(value_states, dim=-1)
 
+    # 3. 单卡，得到Q, K, V
     else:
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
-
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
@@ -88,7 +91,11 @@ def llama_attn_forward_StreamingLLM(
         cos, sin = self.rotary_emb(value_states, position_ids)
     else:
         cos, sin = position_embeddings
+
+    # 4. 对Q和K进行旋转位置编码
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+
+    # 5. 多头注意力
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -105,16 +112,19 @@ def llama_attn_forward_StreamingLLM(
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
 
-
+    # 6. 注意力分数
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attention_mask is not None:  # no matter the length, we just slice it
         causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
         attn_weights = attn_weights + causal_mask
 
+    # 7. 注意力权重
     # upcast attention to fp32
     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
     attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+    
+    # 8. 注意力输出
     attn_output = torch.matmul(attn_weights, value_states)
 
     if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):

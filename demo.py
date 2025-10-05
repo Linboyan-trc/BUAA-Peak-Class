@@ -101,12 +101,18 @@ def main():
 
     # 4. 基础推理
     model = load_model(model_name, attn_impl="sdpa", device=device)
-    run_and_log("Baseline (SPDA Attention)", model, tokenizer, long_prompt, device)
+    from torch.profiler import profile, ProfilerActivity
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                 record_shapes=True,
+                 profile_memory=True,
+                 with_stack=True) as prof:
+        run_and_log("Baseline (SPDA Attention)", model, tokenizer, long_prompt, device)
+    prof.export_chrome_trace("cpu_trace.json")
 
-    # 5. 做了KV-Cache优化的推理
-    replace_llama("streamingllm")
-    model = load_model(model_name, attn_impl="sdpa", device=device)
-    run_and_log("StreamingLLM + SPDA Attention", model, tokenizer, long_prompt, device)
+    # # 5. 做了KV-Cache优化的推理
+    # replace_llama("streamingllm")
+    # model = load_model(model_name, attn_impl="sdpa", device=device)
+    # run_and_log("StreamingLLM + SPDA Attention", model, tokenizer, long_prompt, device)
 
 if __name__ == "__main__":
     main()
