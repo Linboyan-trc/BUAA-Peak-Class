@@ -79,7 +79,8 @@ def move_mlp_to_cpu(model):
         x = x.to("cpu")
         return self._original_forward(x).to('cuda')
     for name, module in model.named_modules():
-        if "mlp" in name.lower():
+        # 只处理顶层 MLP 层
+        if "mlp" in name.lower() and "." not in name.split("mlp")[-1]:
             print("Moving MLP to CPU:", name)
             module._original_forward = module.forward
             module.forward = types.MethodType(fwd_cpu, module)
