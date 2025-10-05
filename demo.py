@@ -1,6 +1,7 @@
 import transformers
 import torch
 import time
+import types
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from llama_model import llama_attn_forward_StreamingLLM
 from llama_model import llama_sdpa_attn_forward_StreamingLLM
