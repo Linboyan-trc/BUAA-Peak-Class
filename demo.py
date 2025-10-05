@@ -72,6 +72,18 @@ def benchmark(model, tokenizer, prompt, max_new_tokens=128, device="cuda:1"):
     }
 
 ####################################################################################################
+# 3. mlp移动到cpu
+def move_mlp_to_cpu(model):
+    def fwd_cpu(self, x):
+        x = x.to("cpu")
+        return self._original_forward(x).to('cuda')
+    for name, module in model.named_modules():
+        if "mlp" in name.lower():
+            print("Moving MLP to CPU:", name)
+            module._original_forward = module.forward
+            module.forward = types.MethodType(fwd_cpu, module)
+            module.to(torch.device("cpu"))
+
 # 2. 替换推理
 def replace_llama(method, model_name=None):
     # 2.1 将原本的注意力计算，Sdpa注意力计算换成自定义的
@@ -101,13 +113,14 @@ def main():
 
     # 4. 基础推理
     model = load_model(model_name, attn_impl="sdpa", device=device)
+    move_mlp_to_cpu(model)
     from torch.profiler import profile, ProfilerActivity
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                  record_shapes=True,
                  profile_memory=True,
                  with_stack=True) as prof:
         run_and_log("Baseline (SPDA Attention)", model, tokenizer, long_prompt, device)
-    prof.export_chrome_trace("cpu_trace.json")
+    prof.export_chrome_trace("cpu_trace_mlp.json")
 
     # # 5. 做了KV-Cache优化的推理
     # replace_llama("streamingllm")
