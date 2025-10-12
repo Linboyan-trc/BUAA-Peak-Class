@@ -114,6 +114,7 @@ def main():
 
     # 4. 基础推理
     model = load_model(model_name, attn_impl="sdpa", device=device)
+    move_mlp_to_cpu(model)
     run_and_log("Baseline (SPDA Attention)", model, tokenizer, long_prompt, device)
 
     # # 5. 做了KV-Cache优化的推理
