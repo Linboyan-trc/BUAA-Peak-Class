@@ -77,7 +77,7 @@ def benchmark(model, tokenizer, prompt, max_new_tokens=128, device="cuda:1"):
 def move_mlp_to_cpu(model):
     def fwd_cpu(self, x):
         x = x.to("cpu")
-        return self._original_forward(x).to('cuda')
+        return self._original_forward(x).to('cuda:3')
     for name, module in model.named_modules():
         if "mlp" in name.lower():
             print("Moving MLP to CPU:", name)
