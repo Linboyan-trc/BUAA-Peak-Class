@@ -3,6 +3,7 @@ import torch
 import time
 import types
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from auto_gptq import AutoGPTQForCausalLM
 from llama_model import llama_attn_forward_StreamingLLM
 from llama_model import llama_sdpa_attn_forward_StreamingLLM
 from llama_model import prepare_inputs_for_generation_llama, prepare_inputs_for_generation_llama_new
@@ -100,28 +101,34 @@ def replace_llama(method, model_name=None):
 # 1. 推理
 def main():
     # 1. 指定模型和设备
-    model_name = "/mtc/longlingkun/models/llama3.1-8b-instruct"
+    model_name = "/mtc/yangrongjin/models/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4"
     device = "cuda:3"
 
     # 2. 加载分词器
     # 2.1 将句子划分成多个有先后顺序的token，并且根据预先训练好的模型中的单词表，将字符转换为单词表中的索引，或者说id
     print("加载分词器...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
     # 3. 读取长prompt
     with open("long_prompt.txt", "r", encoding="utf-8") as f:
         long_prompt = f.read()
 
     # 4. 基础推理
-    model = load_model(model_name, attn_impl="sdpa", device=device)
-    move_mlp_to_cpu(model)
-    from torch.profiler import profile, ProfilerActivity
-    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                 record_shapes=True,
-                 profile_memory=True,
-                 with_stack=True) as prof:
-        run_and_log("Baseline (SPDA Attention)", model, tokenizer, long_prompt, device)
-    prof.export_chrome_trace("cpu_trace_mlp.json")
+    # model = load_model(model_name, attn_impl="sdpa", device=device)
+    model = AutoGPTQForCausalLM.from_quantized(
+        model_name,
+        device_map={"": device},
+        use_triton=False,
+        trust_remote_code=True
+    )
+    
+    # from torch.profiler import profile, ProfilerActivity
+    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+    #              record_shapes=True,
+    #              profile_memory=True,
+    #              with_stack=True) as prof:
+    run_and_log("GPTQ 推理", model, tokenizer, long_prompt, device)
+    # prof.export_chrome_trace("cpu_trace_mlp.json")
 
     # # 5. 做了KV-Cache优化的推理
     # replace_llama("streamingllm")
