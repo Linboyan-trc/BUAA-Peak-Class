@@ -89,7 +89,7 @@ def replace_llama(method, model_name=None):
 def main():
     # 1. 指定模型和设备
     model_name = "/mtc/longlingkun/models/llama3.1-8b-instruct"
-    device = "cuda:2"
+    device = "cuda:3"
 
     # 2. 加载分词器
     # 2.1 将句子划分成多个有先后顺序的token，并且根据预先训练好的模型中的单词表，将字符转换为单词表中的索引，或者说id

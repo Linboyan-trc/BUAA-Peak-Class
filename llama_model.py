@@ -178,6 +178,7 @@ def llama_sdpa_attn_forward_StreamingLLM(
             position_embeddings=position_embeddings,
         )
 
+    # 1. 初始化
     init_StreamingLLM(self)
 
     bsz, q_len, _ = hidden_states.size()
@@ -190,6 +191,7 @@ def llama_sdpa_attn_forward_StreamingLLM(
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
+    # 2. 获取token数量，26554
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
